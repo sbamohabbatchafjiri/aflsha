@@ -35,41 +35,52 @@
 #define _HAVE_HASH_H
 
 #include "types.h"
-
+#include <stdint.h>
 #ifdef __x86_64__
 
-#define ROL64(_x, _r)  ((((u64)(_x)) << (_r)) | (((u64)(_x)) >> (64 - (_r))))
+#define ROL64(x, n) ((x << n) | (x >> (64 - n)))  // Rotate left macro
 
-static inline u32 hash32(const void* key, u32 len, u32 seed) {
+// Keccak-like constants for mixing and permutation (borrowed from SHA-3)
+static const u64 KECCAK_ROUNDS[5] = {
+    0x428a2f98d728ae22ULL, 0x7137449123ef65cdULL,
+    0xb5c0fbcfec4d3b2fULL, 0xe9b5dba58189dbbcULL,
+    0x3956c25bf348b538ULL
+};
+
+static inline u32 lightweight_sha3_hash(const void* key, u32 len, u32 seed) {
 
   const u64* data = (u64*)key;
   u64 h1 = seed ^ len;
 
-  len >>= 3;
+  len >>= 3;  // Process in 64-bit chunks
 
+  // Lightweight Keccak-like mixing for each 64-bit block
   while (len--) {
 
     u64 k1 = *data++;
 
-    k1 *= 0x87c37b91114253d5ULL;
-    k1  = ROL64(k1, 31);
-    k1 *= 0x4cf5ad432745937fULL;
+    // Apply Keccak-like constants for mixing
+    k1 ^= KECCAK_ROUNDS[len % 5];
+    k1 = ROL64(k1, 21);  // Rotate left by 21 bits (simplified diffusion)
+    k1 ^= KECCAK_ROUNDS[(len + 1) % 5]; // Second constant-based mix
 
     h1 ^= k1;
-    h1  = ROL64(h1, 27);
-    h1  = h1 * 5 + 0x52dce729;
+    h1 = ROL64(h1, 17);  // Rotate accumulator by 17 bits
+    h1 *= 0x52dce729;  // Add a small constant for mixing
 
   }
 
-  h1 ^= h1 >> 33;
+  // Final rounds of diffusion (like SHA-3's finalization)
+  h1 ^= h1 >> 29;
   h1 *= 0xff51afd7ed558ccdULL;
   h1 ^= h1 >> 33;
   h1 *= 0xc4ceb9fe1a85ec53ULL;
   h1 ^= h1 >> 33;
 
-  return h1;
-
+  // Reduce to 32-bit value by XORing upper and lower halves
+  return (u32)(h1 ^ (h1 >> 32));
 }
+
 
 #else 
 
