@@ -42,25 +42,28 @@
 
 // Keccak-like constants for mixing and permutation
 static const u64 KECCAK_ROUNDS[5] = {
-    0x428a2f98d728ae22ULL, 0x7137449123ef65cdULL,
-    0xb5c0fbcfec4d3b2fULL, 0xe9b5dba58189dbbcULL,
+    0x428a2f98d728ae22ULL,
+    0x7137449123ef65cdULL,
+    0xb5c0fbcfec4d3b2fULL,
+    0xe9b5dba58189dbbcULL,
     0x3956c25bf348b538ULL
 };
 
-static inline u32 lightweight_sha3_hash(const void* key, u32 len, u32 seed) {
+// Keccak-like hash for 64-bit systems
+static inline u32 hash32(const void* key, u32 len, u32 seed) {
     const u64* data = (const u64*)key;
     u64 h1 = seed ^ len;
 
     len >>= 3;  // Process in 64-bit chunks
 
     // Lightweight Keccak-like mixing for each 64-bit block
-    for (u32 i = 0; i < len; ++i) {
-        u64 k1 = data[i];
+    while (len--) {
+        u64 k1 = *data++;  // Dereference and increment pointer
 
         // Apply Keccak-like constants for mixing
-        k1 ^= KECCAK_ROUNDS[i % 5];
+        k1 ^= KECCAK_ROUNDS[len % 5];
         k1 = ROL64(k1, 21);  // Rotate left by 21 bits
-        k1 ^= KECCAK_ROUNDS[(i + 1) % 5]; // Second constant-based mix
+        k1 ^= KECCAK_ROUNDS[(len + 1) % 5];  // Second constant-based mix
 
         h1 ^= k1;
         h1 = ROL64(h1, 17);  // Rotate accumulator by 17 bits
@@ -82,25 +85,28 @@ static inline u32 lightweight_sha3_hash(const void* key, u32 len, u32 seed) {
 
 #define ROL32(_x, _r)  ((((u32)(_x)) << (_r)) | (((u32)(_x)) >> (32 - (_r))))
 
+// MurmurHash3-like function for 32-bit systems
 static inline u32 hash32(const void* key, u32 len, u32 seed) {
     const u32* data = (const u32*)key;
     u32 h1 = seed ^ len;
 
     len >>= 2;  // Process in 32-bit chunks
 
-    for (u32 i = 0; i < len; ++i) {
-        u32 k1 = data[i];
+    // Process data using pointer arithmetic
+    while (len--) {
+        u32 k1 = *data++;  // Dereference and increment pointer
 
-        // MurmurHash mixing steps
+        // MurmurHash-like mixing operations
         k1 *= 0xcc9e2d51;
-        k1  = ROL32(k1, 15);
+        k1 = ROL32(k1, 15);
         k1 *= 0x1b873593;
 
         h1 ^= k1;
-        h1  = ROL32(h1, 13);
-        h1  = h1 * 5 + 0xe6546b64;
+        h1 = ROL32(h1, 13);
+        h1 = h1 * 5 + 0xe6546b64;
     }
 
+    // Final avalanche mixing
     h1 ^= h1 >> 16;
     h1 *= 0x85ebca6b;
     h1 ^= h1 >> 13;
