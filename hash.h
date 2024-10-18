@@ -56,18 +56,57 @@ static inline u32 hash32(const void* key, u32 len, u32 seed) {
 
     len >>= 3;  // Process in 64-bit chunks
 
-    // Lightweight Keccak-like mixing for each 64-bit block
-    while (len--) {
-        u64 k1 = *data++;  // Dereference and increment pointer
+    // Unrolled loop to improve performance
+    while (len >= 4) {
+        u64 k1 = *data++;
+        k1 ^= KECCAK_ROUNDS[0];
+        k1 = ROL64(k1, 21);
+        k1 ^= KECCAK_ROUNDS[1];
+        
+        h1 ^= k1;
+        h1 = ROL64(h1, 17);
+        h1 *= 0x52dce729;
 
-        // Apply Keccak-like constants for mixing
+        k1 = *data++;
+        k1 ^= KECCAK_ROUNDS[2];
+        k1 = ROL64(k1, 21);
+        k1 ^= KECCAK_ROUNDS[3];
+        
+        h1 ^= k1;
+        h1 = ROL64(h1, 17);
+        h1 *= 0x52dce729;
+
+        k1 = *data++;
+        k1 ^= KECCAK_ROUNDS[4];
+        k1 = ROL64(k1, 21);
+        k1 ^= KECCAK_ROUNDS[0];
+        
+        h1 ^= k1;
+        h1 = ROL64(h1, 17);
+        h1 *= 0x52dce729;
+
+        k1 = *data++;
+        k1 ^= KECCAK_ROUNDS[1];
+        k1 = ROL64(k1, 21);
+        k1 ^= KECCAK_ROUNDS[2];
+        
+        h1 ^= k1;
+        h1 = ROL64(h1, 17);
+        h1 *= 0x52dce729;
+
+        len -= 4;
+    }
+
+    // Process remaining blocks
+    while (len--) {
+        u64 k1 = *data++;
         k1 ^= KECCAK_ROUNDS[len % 5];
-        k1 = ROL64(k1, 21);  // Rotate left by 21 bits
-        k1 ^= KECCAK_ROUNDS[(len + 1) % 5];  // Second constant-based mix
+        k1 = ROL64(k1, 21);
+        k1 ^= KECCAK_ROUNDS[(len + 1) % 5];
 
         h1 ^= k1;
-        h1 = ROL64(h1, 17);  // Rotate accumulator by 17 bits
-        h1 *= 0x52dce729;     // Add a small constant for mixing
+        h1 = ROL64(h1, 17);
+        h1 *= 0x52dce729;
     }
 
     // Final rounds of diffusion (like SHA-3's finalization)
@@ -77,7 +116,6 @@ static inline u32 hash32(const void* key, u32 len, u32 seed) {
     h1 *= 0xc4ceb9fe1a85ec53ULL;
     h1 ^= h1 >> 33;
 
-    // Reduce to 32-bit value by XORing upper and lower halves
     return (u32)(h1 ^ (h1 >> 32));
 }
 
@@ -92,11 +130,8 @@ static inline u32 hash32(const void* key, u32 len, u32 seed) {
 
     len >>= 2;  // Process in 32-bit chunks
 
-    // Process data using pointer arithmetic
     while (len--) {
-        u32 k1 = *data++;  // Dereference and increment pointer
-
-        // MurmurHash-like mixing operations
+        u32 k1 = *data++;
         k1 *= 0xcc9e2d51;
         k1 = ROL32(k1, 15);
         k1 *= 0x1b873593;
